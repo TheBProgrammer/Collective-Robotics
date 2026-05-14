@@ -1,7 +1,3 @@
-"""
-Task 1e: Same as 1d but processing duration = 2 steps/job, alpha in [0.005, 0.5].
-Produces a side-by-side comparison with the 4-step result.
-"""
 import matplotlib.pyplot as plt
 from queue_model import simulate_queue
 

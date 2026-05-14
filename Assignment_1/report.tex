@@ -49,7 +49,7 @@
     Prof.\ Dr.\ Javad Ghofrani
 }
 \author{Bhavesh Gandhi \and Jaqueline Machida}
-\date{Deadline: 17.05.2026}
+\date{17.05.2026}
 
 \begin{document}
 
@@ -64,7 +64,7 @@
 
 \subsection{Overview}
 
-We model a computer job queue using a \textbf{Poisson arrival process}.
+We model a computer job queue using a Poisson arrival process.
 New jobs arrive at rate $\alpha$ per time step; since we set $\Delta t = 1$,
 the parameter becomes $\lambda = \alpha$.
 The probability that exactly $i$ jobs arrive in one time step is:
@@ -86,20 +86,22 @@ subtask scripts.
 Evaluates Equation~(1) analytically using Python's \texttt{math} module.
 
 \paragraph{Sampler (\texttt{sample\_poisson}).}
-Draws samples from the Poisson distribution using Knuth's inversion algorithm:
-starting from a uniform random product $p \leftarrow \prod U_k$, we count how
-many factors are needed before $p$ falls below $e^{-\lambda}$.
-This requires only the standard \texttt{random} module.
+Draws samples using inverse transform sampling directly from the PMF
+in Equation~(1).
+A uniform random number $u \in [0,1)$ is drawn and the cumulative probability
+$\sum_{k=0}^{i} P(X=k)$ is accumulated until it first exceeds $u$; the
+corresponding $i$ is returned as the sample.
 
 \begin{lstlisting}
 def sample_poisson(alpha):
-    lam = alpha
-    L = math.exp(-lam)
-    k, p = 0, 1.0
-    while p > L:
-        p *= random.random()
-        k += 1
-    return k - 1
+    u = random.random()
+    cumulative = 0.0
+    i = 0
+    while True:
+        cumulative += poisson_pmf(i, alpha)
+        if u < cumulative:
+            return i
+        i += 1
 \end{lstlisting}
 
 \paragraph{Queue simulation (\texttt{simulate\_queue}).}
@@ -123,7 +125,7 @@ variance both equal $\lambda = \alpha$.
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=\textwidth]{task_1/task1a_poisson_pmf.png}
+    \includegraphics[width=\textwidth]{task_1/plots/task1a_poisson_pmf.png}
     \caption{Poisson PMF $P(X=i)$ for four arrival rates $\alpha$.}
     \label{fig:1a}
 \end{figure}
@@ -137,7 +139,7 @@ sampler is correct.
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=0.75\textwidth]{task_1/task1b_sampling.png}
+    \includegraphics[width=0.75\textwidth]{task_1/plots/task1b_sampling.png}
     \caption{Empirical frequency vs.\ theoretical PMF for $\alpha = 0.5$,
              10\,000 samples.}
     \label{fig:1b}
@@ -146,8 +148,8 @@ sampler is correct.
 \subsection{Subtask c -- Single Simulation Run}
 
 We ran the queue model for 2000 time steps with $\alpha = 0.1$ and a processing
-duration of 4 steps per job.  The resulting \textbf{average queue length was
-approximately 0.16 jobs}.
+duration of 4 steps per job.  The resulting average queue length was
+0.1235 jobs.
 
 This low value is expected: the average arrival rate is $\alpha = 0.1$ jobs/step,
 while the server can process $1/4 = 0.25$ jobs/step, so the system is well below
@@ -161,7 +163,7 @@ lengths to obtain one representative point per $\alpha$ (see Figure~\ref{fig:1d}
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=0.85\textwidth]{task_1/task1d_avg_queue_4steps.png}
+    \includegraphics[width=0.85\textwidth]{task_1/plots/task1d_avg_queue_4steps.png}
     \caption{Average queue length as a function of $\alpha$ for a processing
              duration of 4 steps per job (200 runs $\times$ 2000 steps each).}
     \label{fig:1d}
@@ -172,17 +174,16 @@ The curve is nearly flat and close to zero for small $\alpha$, then rises steepl
 as $\alpha$ approaches $0.25$.  This is a classic queuing-theory result: the
 system is stable when the arrival rate is below the service rate
 ($\alpha < 1/\text{processing\_duration} = 0.25$), and the queue diverges as
-$\alpha \to 0.25$ from below.  The sharp increase near saturation is characteristic
-of an M/D/1 queue (Poisson arrivals, deterministic service, one server).
+$\alpha$ approaches $0.25$.
 
 \subsection{Subtask e -- Comparison: 2 vs.\ 4 Steps per Job}
 
 Figure~\ref{fig:1e} shows the same experiment for a processing duration of
-\textbf{2 steps/job} with $\alpha \in [0.005,\,0.5]$ alongside the 4-step case.
+2 steps/job with $\alpha \in [0.005,\,0.5]$ alongside the 4-step case.
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=\textwidth]{task_1/task1e_comparison.png}
+    \includegraphics[width=\textwidth]{task_1/plots/task1e_comparison.png}
     \caption{Side-by-side comparison of average queue length vs.\ $\alpha$ for
              processing durations of 4 (left) and 2 (right) steps per job.}
     \label{fig:1e}
@@ -191,10 +192,7 @@ Figure~\ref{fig:1e} shows the same experiment for a processing duration of
 \paragraph{Discussion.}
 Halving the processing duration doubles the server throughput from 0.25 to
 0.50 jobs/step.  Consequently the critical arrival rate at which the queue
-explodes shifts from $\approx 0.25$ to $\approx 0.50$.  The shape of the
-curve is identical -- a flat region followed by a steep rise near saturation --
-but the entire curve is stretched along the $\alpha$ axis by a factor of two.
-This confirms that the saturation threshold is governed purely by the ratio
+explodes shifts from $0.25$ to $0.50$. This confirms that the saturation threshold is governed purely by the ratio
 $\alpha / (1/\text{processing\_duration})$.
 
 \newpage
@@ -209,7 +207,7 @@ $1\times1$ square.  Each firefly has a clock of length $L = 50$ steps: it
 flashes for the first $L/2 = 25$ steps and is dark for the remaining 25.
 Fireflies interact locally: one step after starting to flash (i.e., at
 \texttt{clock = 1}), a firefly checks its neighbours within radius $r$ and
-applies a \textbf{local majority rule} -- if more than half of its neighbours
+applies a local majority rule -- if more than half of its neighbours
 are currently flashing, it advances its own clock by an extra step, which
 causes it to flash one step earlier in the next cycle.
 

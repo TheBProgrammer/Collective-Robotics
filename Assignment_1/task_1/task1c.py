@@ -1,4 +1,3 @@
-"""Task 1c: Simulate 2000 steps with alpha=0.1, processing duration=4. Report avg queue length."""
 from queue_model import simulate_queue
 
 alpha = 0.1

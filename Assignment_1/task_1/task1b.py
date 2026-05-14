@@ -1,4 +1,3 @@
-"""Task 1b: Sample incoming jobs from P(X=i) and compare empirical distribution to PMF."""
 import matplotlib.pyplot as plt
 from collections import Counter
 from queue_model import poisson_pmf, sample_poisson

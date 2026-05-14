@@ -1,8 +1,3 @@
-"""
-Task 1d: For alpha in [0.005, 0.25] step 0.005, run 200 independent 2000-step simulations,
-average the queue lengths, and plot the final average vs alpha.
-Processing duration = 4 steps/job.
-"""
 import matplotlib.pyplot as plt
 from queue_model import simulate_queue
 

@@ -1,4 +1,3 @@
-"""Task 1a: Plot P(X=i) for alpha in {0.01, 0.1, 0.5, 1} over a reasonable range of X."""
 import matplotlib.pyplot as plt
 from queue_model import poisson_pmf
 
