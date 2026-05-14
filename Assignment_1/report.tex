@@ -207,7 +207,7 @@ $1\times1$ square.  Each firefly has a clock of length $L = 50$ steps: it
 flashes for the first $L/2 = 25$ steps and is dark for the remaining 25.
 Fireflies interact locally: one step after starting to flash (i.e., at
 \texttt{clock = 1}), a firefly checks its neighbours within radius $r$ and
-applies a local majority rule -- if more than half of its neighbours
+applies a local majority rule: if more than half of its neighbours
 are currently flashing, it advances its own clock by an extra step, which
 causes it to flash one step earlier in the next cycle.
 
@@ -291,7 +291,7 @@ Three regions are visible:
 
 \begin{enumerate}
     \item \textbf{$r < 0.3$:} Amplitude rises steeply from $\approx 20$ to
-          $\approx 100$.  Connectivity is insufficient for global sync; only
+          $\approx 120$.  Connectivity is insufficient for global sync; only
           small local clusters form.
     \item \textbf{$r \approx 0.3$--$0.5$:} Amplitude plateaus at its maximum
           ($\approx 140$--$148$).  This is the optimal operating range.
@@ -306,12 +306,12 @@ of $r \approx 0.3$--$0.4$ is optimal.  It provides enough neighbours
 range small (energy-efficient, bio-plausible).
 
 \paragraph{Interpretation of amplitude.}
-A \emph{low amplitude} means fireflies flash nearly independently: at any
+A low amplitude means fireflies flash nearly independently: at any
 moment, roughly half the swarm flashes (${\sim}75$ out of 150), with no
-coherent peaks.  A \emph{high amplitude} means the swarm flashes
+coherent peaks.  A high amplitude means the swarm flashes
 collectively: almost all fireflies flash simultaneously, and the count swings
 close to 0 and 150 each cycle.  Amplitude is therefore a direct measure of
-\emph{synchronization quality}.
+synchronization quality.
 
 \newpage
 % =============================================================================
