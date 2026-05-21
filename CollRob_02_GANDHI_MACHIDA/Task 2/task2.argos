@@ -1,0 +1,73 @@
+<?xml version="1.0" ?>
+<argos-configuration>
+
+  <!-- General Config -->
+  <framework>
+    <system threads="0" />
+    <!--
+      length: total experiment time in seconds (0 = no limit)
+      ticks_per_second: 10 means each step() call = 0.1 s of simulated time
+      random_seed: fix for reproducibility; change for different runs
+    -->
+    <experiment length="0" ticks_per_second="10" random_seed="124" />
+  </framework>
+
+  <!-- Controllers -->
+  <controllers>
+    <lua_controller id="swarm_controller">
+      <actuators>
+        <differential_steering implementation="default" />
+        <range_and_bearing implementation="default" />
+        <leds implementation="default" medium="leds" />
+      </actuators>
+      <sensors>
+        <!-- 24 proximity sensors around the robot base (value 0..1) -->
+        <footbot_proximity  implementation="default" show_rays="true" />
+        <!-- Range-and-bearing: detects other robots (range in cm) -->
+        <range_and_bearing  implementation="medium"  medium="rab" show_rays="false" />
+      </sensors>
+      <params script="task2.lua" />
+    </lua_controller>
+  </controllers>
+
+  <!-- Arena Configuration -->
+  <!-- Arena: 4x4 m playfield inside a 5x5 m area -->
+  <arena size="5, 5, 1" center="0,0,0.5">
+    <box id="wall_north" size="4,0.1,0.5" movable="false"><body position="0,2,0"   orientation="0,0,0" /></box>
+    <box id="wall_south" size="4,0.1,0.5" movable="false"><body position="0,-2,0"  orientation="0,0,0" /></box>
+    <box id="wall_east"  size="0.1,4,0.5" movable="false"><body position="2,0,0"   orientation="0,0,0" /></box>
+    <box id="wall_west"  size="0.1,4,0.5" movable="false"><body position="-2,0,0"  orientation="0,0,0" /></box>
+
+    <!-- Distribute 50 foot-bots uniformly at random inside the arena -->
+    <distribute>
+      <position    method="uniform"  min="-1.8, -1.8, 0" max="1.8, 1.8, 0" />
+      <orientation method="gaussian" mean="0, 0, 0" std_dev="360, 0, 0" />
+      <entity quantity="50" max_trials="100">
+        <foot-bot id="fb"><controller config="swarm_controller" /></foot-bot>
+      </entity>
+    </distribute>
+  </arena>
+
+  <!-- Physics -->
+  <physics_engines>
+    <dynamics2d id="dyn2d" />
+  </physics_engines>
+
+  <!-- Media -->
+  <media>
+    <range_and_bearing id="rab" />    <!-- RAB medium -->
+    <led id="leds" />                 <!-- LED medium -->
+  </media>
+
+  <!-- Visualization -->
+  <visualization>
+    <qt-opengl>
+      <camera>
+        <placements>
+          <placement index="0" position="0,0,6" look_at="0,0,0" up="1,0,0" lens_focal_length="20" />
+        </placements>
+      </camera>
+    </qt-opengl>
+  </visualization>
+
+</argos-configuration>
