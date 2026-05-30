@@ -1,86 +1,102 @@
-# uav-path-planning
+# Single-Robot Behaviors (ROS 2 Jazzy + Gazebo Harmonic)
 
-## Quick start
+Three reactive behaviors for a simulated vacuum-cleaner robot in the TurtleBot3
+House world: **collision avoidance**, **wall following**, and **vacuum-cleaner
+coverage**. Each behavior is a standalone ROS 2 node with its own launch file.
 
-```bash
-# Host: start the Docker container
-cd ~/ros2_ws
-./scripts/start.sh
+## Prerequisites
 
-# Inside the container: launch simulation + navigation
-./scripts/launch_sim.sh
+- Docker (the workspace is set up to run inside a containerized ROS 2 Jazzy /
+  Gazebo Harmonic environment).
 
-# Open a second terminal inside the running container
-./scripts/shell.sh
+## Build & source
 
-# Stop and exit the container
-exit
-```
-
-## Package overview
-
-| Package | Contents |
-|---|---|
-| `uav_gazebo` | Gazebo sim nodes (`position_controller`, `odom_to_tf`, `pointcloud_relay`), forest worlds, tree models |
-| `uav_navigation` | Path planning server, path follower, collision monitor |
-| `uav_description` | Robot URDF/SDF |
-| `uav_bringup` | Top-level launch files |
-| `uav_benchmarks` | Evaluation / benchmarking tools |
-
-## uav_navigation — key files
-
-```
-uav_navigation/
-├── include/uav_navigation/
-│   └── planners/
-│       ├── planner_interface.hpp   ← pluginlib base class
-│       ├── astar_planner.hpp
-│       └── dstar_lite_planner.hpp
-├── src/
-│   ├── planners/
-│   │   ├── astar_planner.cpp
-│   │   └── dstar_lite_planner.cpp
-│   ├── planner_server_node.cpp
-│   ├── path_follower_node.cpp
-│   └── collision_monitor_node.cpp
-├── config/
-│   └── uav_nav_params.yaml         ← all tunable parameters in one file
-├── launch/
-│   └── navigation.launch.py
-└── plugins.xml                     ← pluginlib planner registry
-```
-
-All navigation parameters live in `config/uav_nav_params.yaml`,
-namespaced per node (`planner_server`, `path_follower`, `collision_monitor`).
-
-### Switching planners
-
-Pass `planner_type` at launch or edit `uav_nav_params.yaml`:
+From the host:
 
 ```bash
-ros2 launch uav_navigation navigation.launch.py planner_type:=astar
-ros2 launch uav_navigation navigation.launch.py planner_type:=dstar_lite
+cd ros2_ws
+./scripts/start.sh       # brings up the container
 ```
 
-Planners are loaded at runtime via pluginlib — adding a new planner
-only requires a new shared library entry in `plugins.xml`; the server
-node does not need to be recompiled.
-
-## Utilities
+Inside the container:
 
 ```bash
-# Send a velocity command directly to the drone
-gz topic -t /X3/cmd_vel -m gz.msgs.Twist -p '
-linear: {x: 0.0, y: 0.0, z: 1.0}
-angular: {z: 0.0}
-'
-
-# Plot trajectory
-ros2 run plotjuggler plotjuggler
-
-# Generate procedural forest worlds
-python3 src/uav_gazebo/scripts/gen_worlds.py \
-    --num_worlds 10 --world_length 10 --tree_density 0.1 --max_height 0
-python3 src/uav_gazebo/scripts/gen_worlds.py \
-    --num_worlds 10 --world_length 10 --tree_density 0.1 --max_height 1.0
+cd /root/ros2_ws
+colcon build --symlink-install
+source install/setup.bash
 ```
+
+After editing any node you can rebuild only the package:
+
+```bash
+colcon build --packages-select single_robot --symlink-install
+```
+
+## Running each behavior
+
+Every launch file does the same setup: starts Gazebo on the TurtleBot3 House
+world, spawns the vacuum cleaner model, starts the ROS and Gazebo bridge for
+`/scan`, `/cmd_vel`, `/odom`, `/tf`, `/joint_states`  and then runs the node
+for that behavior.
+
+### 1. Collision avoidance
+
+```bash
+ros2 launch single_robot collision_avoidance.launch.py
+```
+
+The robot drives forward at constant speed and rotates in place toward the
+freer side whenever an obstacle enters the front cone. Hysteresis on the
+trigger/clear distances prevents chattering at the threshold.
+
+### 2. Wall following
+
+```bash
+ros2 launch single_robot wall_follower.launch.py
+```
+
+The robot searches for a wall on its right, then maintains a target distance
+(0.40 m) to that wall using a PD controller on the side-cone minimum. A
+`CORNER_TURN` state rotates left in place when the front is blocked
+(concave corner), and the PD controller naturally curls back toward the wall
+at convex corners.
+
+### 3. Vacuum cleaner
+
+```bash
+ros2 launch single_robot vacuum_cleaner.launch.py
+```
+
+The robot performs a back-and-forth lawnmower pattern:
+
+1. **SWEEP**: drive forward until an obstacle appears in front.
+2. **TURN_A**: rotate 90° toward the alternating side using odometry.
+3. **SHIFT**: drive forward by one body width (0.34 m), or until blocked /
+   timeout.
+4. **TURN_B**: rotate another 90° in the same direction to reverse heading
+   and start the next stripe.
+
+The U-turn direction flips between cycles so consecutive shifts always
+advance to the same side of the room, producing parallel stripes. Turns and
+the SHIFT distance use proportional control so the motion stops cleanly
+without overshoot.
+
+## Customizing the spawn pose
+
+Each launch file spawns the robot at a fixed `(x, y)` inside the house. Edit
+the `spawn_vacuum` block of the corresponding launch file under
+`src/single_robot/launch/` to start the robot in a different room.
+
+## Tuning
+
+All behavior parameters are class constants at the top of each node file under
+`src/single_robot/single_robot/`. The most useful ones:
+
+- `collision_avoidance_node.py`: `CRUISE_SPEED`, `TURN_SPEED`,
+  `TRIGGER_DISTANCE`, `CLEAR_DISTANCE`.
+- `wall_follower_node.py`: `TARGET_DISTANCE`, `KP`, `KD`, `CORNER_TRIGGER`.
+- `vacuum_cleaner_node.py`: `FORWARD_SPEED`, `TURN_SPEED`, `BODY_WIDTH`,
+  `KP_YAW`, `KP_SHIFT`, `SHIFT_TIMEOUT`.
+
+After changes, rebuild with `colcon build --packages-select single_robot
+--symlink-install` and relaunch.

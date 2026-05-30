@@ -22,6 +22,7 @@
       <pose>0 0 0.078 0 0 0</pose>
 
       <inertial>
+        <pose>0.05 0 0 0 0 0</pose>
         <mass>2.0</mass>
         <inertia>
           <ixx>0.0159</ixx>
@@ -66,6 +67,21 @@
         <material>
           <ambient>0.9 0.45 0.05 1</ambient>
           <diffuse>0.9 0.45 0.05 1</diffuse>
+        </material>
+      </visual>
+
+      <!-- Front-direction marker (visible from above) -->
+      <visual name="front_marker_visual">
+        <pose>0.13 0 0.048 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.018</radius>
+            <length>0.008</length>
+          </cylinder>
+        </geometry>
+        <material>
+          <ambient>0.4 0.4 0.4 1</ambient>
+          <diffuse>0.4 0.4 0.4 1</diffuse>
         </material>
       </visual>
     </link>
@@ -199,7 +215,7 @@
       <parent>base_link</parent>
       <child>left_wheel_link</child>
       <axis>
-        <xyz>0 1 0</xyz>
+        <xyz expressed_in="__model__">0 1 0</xyz>
         <dynamics>
           <damping>0.001</damping>
         </dynamics>
@@ -255,7 +271,7 @@
       <parent>base_link</parent>
       <child>right_wheel_link</child>
       <axis>
-        <xyz>0 1 0</xyz>
+        <xyz expressed_in="__model__">0 1 0</xyz>
         <dynamics>
           <damping>0.001</damping>
         </dynamics>

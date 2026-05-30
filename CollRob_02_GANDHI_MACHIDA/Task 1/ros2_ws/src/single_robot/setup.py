@@ -36,9 +36,9 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'collision_avoidance = single_robot.collision_avoidance:main',
-            'wall_follower = single_robot.wall_follower:main',
-            'vacuum_cleaner = single_robot.vacuum_cleaner:main',
+            'collision_avoidance_node = single_robot.collision_avoidance_node:main',
+            'wall_follower_node = single_robot.wall_follower_node:main',
+            'vacuum_cleaner_node = single_robot.vacuum_cleaner_node:main',
         ],
     },
 )
