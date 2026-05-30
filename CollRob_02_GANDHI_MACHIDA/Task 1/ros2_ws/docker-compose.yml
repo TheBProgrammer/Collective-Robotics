@@ -2,43 +2,30 @@ services:
   ros2_jazzy:
     build: .
 
-    # Resource limits
     deploy:
       resources:
         limits:
           memory: 2G
           cpus: '2'
-        # GPU support
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
 
-    # Shared memory for GUI applications (Gazebo, RViz)
+    # Shared memory for Gazebo / RViz.
     shm_size: 512m
 
-    # Environment variables
     environment:
       - DISPLAY=${DISPLAY}
       - QT_X11_NO_MITSHM=1
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=all
 
-    # Volumes
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - ./src:/root/ros2_ws/src:rw
       - ./scripts:/root/ros2_ws/scripts:rw
       - ./results:/root/ros2_ws/results:rw
 
-    # Devices
+    # Hardware-accelerated GUI on Intel/AMD via DRI.
     devices:
       - /dev/dri:/dev/dri
 
-    # Interactive terminal
     stdin_open: true
     tty: true
 
-    # Optional: Better ROS 2 networking
     network_mode: host
