@@ -221,8 +221,8 @@ crossed the threshold within 200 s, i.e. no failures - the dense 30-robot,
 |  5%          | 13.2 ± 4.3           |
 | 10%          |  8.5 ± 3.6           |
 | 15%          | 12.4 ± 2.8           |
-| 20%          | 11.3 ± 2.9           |
-| 30%          | 10.6 ± 0.9           |
+| 20%          | 11.3 ± 3.0           |
+| 30%          | 10.6 ± 0.8           |
 
 The 10% setting shows the *fewest* leave orders per anti-agent. This matches
 the previous plot: at that setting the swarm spends more of its time in

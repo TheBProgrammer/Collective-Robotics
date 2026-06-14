@@ -37,13 +37,13 @@
 
 \pagestyle{fancy}
 \fancyhf{}
-\rhead{Collective Robotics -- Tutorial 2}
+\rhead{Collective Robotics -- Tutorial 3}
 \lhead{Gandhi, Machida}
 \cfoot{\thepage}
 
 \title{
     \vspace{-1cm}
-    \textbf{Collective Robotics -- Tutorial 2}\\[0.3em]
+    \textbf{Collective Robotics -- Tutorial 3}\\[0.3em]
     \large Robot Behaviors and Swarm Systems\\[0.5em]
     \normalsize Hochschule Bonn-Rhein-Sieg\\
     Prof.\ Dr.\ Javad Ghofrani
@@ -59,361 +59,475 @@
 \newpage
 
 % =============================================================================
-\section{Task 1 -- Behaviors of a Single Robot}
+\section{Task 1 -- Buffon's Needle Simulation}
 % =============================================================================
 
 \subsection{Overview}
 
-We implemented three reactive behaviors for a simulated vacuum-cleaner robot in
-the TurtleBot3 House world: \textbf{collision avoidance}, \textbf{wall
-following}, and \textbf{vacuum-cleaner coverage} (boustrophedon).  The robot
-model, world, launch files, and ROS\,2 nodes all live in the
-\texttt{single\_robot} package under \texttt{Task~1/ros2\_ws/}.
+We implement and analyze Buffon's Needle, a Monte Carlo experiment
+that estimates the probability that a randomly dropped needle crosses one of a
+set of parallel lines and, from that probability, estimates $\pi$.  All
+experiments use a needle of length $L = 0.7$ and line spacing $D = 1.0$.  Each
+drop is characterized by two random variables: the distance $x$ from the
+needle's center to the nearest line and the acute angle $\theta$ between the
+needle and the lines.  Source code and plots live under \texttt{Task~1/}.
 
-\paragraph{Simulation setup.}
-We used \textbf{ROS\,2 Jazzy} with \textbf{Gazebo Harmonic}.  A custom SDF model
-(\texttt{models/vacuum\_cleaner/model.sdf}) defines a cylindrical robot
-(radius~0.17~m, height~0.09~m) with two differential-drive wheels, a passive
-caster, and a 360° 2D lidar mounted on top.  The Gazebo
-\texttt{DiffDrive} system provides the wheel control, and a
-\texttt{ros\_gz\_bridge} parameter bridge translates \texttt{/scan},
-\texttt{/cmd\_vel}, \texttt{/odom}, \texttt{/tf}, and \texttt{/joint\_states}
-between Gazebo and ROS\,2.
+\subsection{Subtask a -- Derivation of the Crossing Probability}
 
-A snapshot of the simulation environment (TurtleBot3 House) with the vacuum
-cleaner robot spawned inside it is shown in Figure~\ref{fig:task1-screenshot}.
+Because only the position of the needle relative to the nearest line
+matters, the sample space collapses to the rectangle $x \in [0, D/2]$,
+$\theta \in [0, \pi/2]$, and $x$, $\theta$ are sampled uniformly on it.  The
+total sample-space area is therefore
+\[
+    A_{\text{total}} = \frac{D}{2} \cdot \frac{\pi}{2} = \frac{D\pi}{4}.
+\]
+A crossing occurs when the vertical projection from the needle's center to
+its tip reaches the nearest line, i.e.\ $x \le \tfrac{L}{2}\sin\theta$.
+Integrating the crossing condition over $\theta$ gives
+\[
+    A_{\text{success}} = \int_0^{\pi/2} \frac{L}{2}\sin\theta\, d\theta
+    = \frac{L}{2},
+\]
+so the theoretical crossing probability is
+\[
+    P = \frac{A_{\text{success}}}{A_{\text{total}}} = \frac{2L}{D\pi}.
+\]
+Rearranging yields the Monte Carlo estimator for $\pi$:
+\[
+    \pi \approx \frac{2L\,n}{D\,C},
+\]
+where $n$ is the number of needle drops and $C$ is the number of observed
+crossings.  For $L = 0.7$, $D = 1.0$ the theoretical probability is
+$P_{\text{true}} = 1.4/\pi \approx 0.4456$.
+
+\subsection{Subtask b -- Single Simulation ($n = 1000$)}
+
+We sample $n = 1000$ needles by drawing $x \sim \mathcal{U}[0, D/2]$ and
+$\theta \sim \mathcal{U}[0, \pi/2]$ independently and applying the crossing
+condition.  Figure~\ref{fig:task1-needles} shows one such run, where red
+needles correspond to crossings and blue needles to misses.
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=0.85\textwidth]{Task 1/ros2_ws/results/screenshot.png}
-    \caption{Top-down view of the vacuum-cleaner robot in the TurtleBot3 House
-             world used for all three Task~1 experiments.}
-    \label{fig:task1-screenshot}
+    \includegraphics[width=0.7\textwidth]{Task 1/plots/1b_buffon_needle_simulation.png}
+    \caption{Single Buffon's Needle simulation with $n = 1000$ drops.
+             Red: crossings; blue: misses.}
+    \label{fig:task1-needles}
 \end{figure}
 
-\paragraph{Common design.}
-All three behaviors share the same skeleton: a \texttt{LaserScan} subscriber
-caches the latest scan, a timer drives a 20~Hz control loop that walks the
-scan once per tick to compute sector minima (front cone of $\pm30°$, plus
-left/right halves), updates a finite state machine, and publishes a
-\texttt{Twist} on \texttt{/cmd\_vel}.
+In the plotted run the estimated $\pi$ is approximately $3.3333$, higher than
+the true value $\pi \approx 3.1416$.  This deviation is expected for a single
+finite Monte Carlo run: since $\pi$ is estimated as $2Ln/(DC)$, a small
+shortfall in the number of crossings produces a noticeably high $\pi$
+estimate.
 
-\subsection{Collision Avoidance}
+\subsection{Subtask c -- Standard Deviation vs.\ Number of Trials}
 
-The robot drives forward at constant speed and rotates in place when an
-obstacle enters the front cone.  The FSM has two states:
+To quantify variability we repeat the experiment for each
+$n \in \{10, 20, \ldots, 1000\}$ and report the standard deviation of the
+estimated crossing probability (Figure~\ref{fig:task1-std}).
 
-\begin{itemize}
-    \item \textbf{CRUISE} -- publish \texttt{linear.x = CRUISE\_SPEED}.
-    \item \textbf{AVOID} -- stop linear, rotate at $\pm$\texttt{TURN\_SPEED}
-          toward the freer side (chosen at transition time by comparing
-          left/right sector minima).
-\end{itemize}
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.7\textwidth]{Task 1/plots/1c_std_dev_vs_n.png}
+    \caption{Standard deviation of the estimated crossing probability as a
+             function of the number of trials $n$.}
+    \label{fig:task1-std}
+\end{figure}
 
-\textbf{Hysteresis} on the trigger and clear distances
-(\texttt{TRIGGER\_DISTANCE = 0.35~m}, \texttt{CLEAR\_DISTANCE = 0.55~m})
-prevents the robot from chattering between the two states near the threshold.
-The turn direction is frozen for the duration of an AVOID episode so the robot
-commits to one direction rather than oscillating between left and right.
+The curve starts near $0.16$ at $n = 10$, drops sharply, and flattens to about
+$0.015$ by $n = 1000$.  This follows the expected scaling of a binomial
+proportion,
+\[
+    \sigma_{\hat P} = \sqrt{\frac{P(1-P)}{n}},
+\]
+i.e.\ uncertainty shrinks like $1/\sqrt{n}$.  Returns therefore diminish: the
+first few hundred trials buy most of the precision and later trials buy
+proportionally less.
 
-A demonstration video is available at
-\url{https://youtu.be/UbriNbjf1nM}.
+\subsection{Subtask d -- Probability Convergence with 95\,\% CI}
 
-\subsection{Wall Following}
+For a measured proportion $\hat P$ after $n$ trials, the binomial 95\,\%
+confidence interval is
+\[
+    \hat P \pm 1.96\sqrt{\frac{\hat P(1-\hat P)}{n}}.
+\]
+We run 50 independent experiments up to $n = 100$ and plot the running
+probability estimate of each one together with the CI envelope around
+$P_{\text{true}}$ (Figure~\ref{fig:task1-conv}).
 
-The robot performs right-wall following using a small FSM and a PD controller
-on the side-cone distance:
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.7\textwidth]{Task 1/plots/1d_probability_convergence.png}
+    \caption{Running probability estimate for 50 independent experiments and
+             95\,\% binomial confidence envelope around $P_{\text{true}}$.}
+    \label{fig:task1-conv}
+\end{figure}
 
-\begin{itemize}
-    \item \textbf{FIND\_WALL} -- drive forward until the right-side cone (a
-          $\pm30°$ window centered at $-\pi/2$) sees a wall within
-          \texttt{WALL\_DETECT\_DISTANCE = 0.8~m}.
-    \item \textbf{FOLLOW} -- maintain a target distance of $0.4~$m to the right
-          wall using $\omega = K_P \cdot e + K_D \cdot \dot e$, where
-          $e = d_{\mathrm{target}} - d_{\mathrm{right}}$.  Positive error
-          (too close) commands a left turn (away from the wall); negative
-          error (too far) commands a right turn (toward the wall).
-    \item \textbf{CORNER\_TURN} -- when the front cone is blocked (concave
-          corner), stop linear and rotate left in place until the front
-          clears.  Hysteresis on \texttt{CORNER\_TRIGGER}/\texttt{CORNER\_CLEAR}
-          prevents flapping.
-\end{itemize}
+Trajectories fluctuate strongly at small $n$ but concentrate around
+$P_{\text{true}} \approx 0.4456$ as $n$ grows.  The CI envelope narrows
+visibly with $n$, and the cloud of estimates remains roughly centered on the
+true value, suggesting the estimator is unbiased in practice.
 
-Convex corners are handled implicitly: when the right wall disappears, the
-measurement is clamped to \texttt{WALL\_DETECT\_DISTANCE}, which gives a
-constant rightward bias that curls the robot back toward the wall.  An edge
-case handled during development was the initial transition: entering FOLLOW
-from a \emph{front} detection (instead of a side detection) gave the PD
-controller no usable measurement and caused the robot to spin in place; the
-fix was to require the wall to appear on the right side before entering
-FOLLOW, and to redirect head-on detections directly to CORNER\_TURN.
+\subsection{Subtask e -- Confidence Interval Coverage}
 
-A demonstration video is available at
-\url{https://youtu.be/crJzeYGZqmE}.
+Finally, we measure how often the true probability lies outside the
+95\,\% CI as $n$ grows (Figure~\ref{fig:task1-ci}).
 
-\subsection{Vacuum-Cleaner Coverage}
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.7\textwidth]{Task 1/plots/1e_ratio_outside_ci.png}
+    \caption{Fraction of experiments in which $P_{\text{true}}$ falls outside
+             the 95\,\% CI, plotted against $n$.}
+    \label{fig:task1-ci}
+\end{figure}
 
-\paragraph{Coverage strategies.}
-Before settling on an implementation we considered three families of strategies
-for a vacuum-cleaning robot:
+At $n = 1$ the measured outside ratio is very high because the empirical
+proportion can only be $0$ or $1$, producing a degenerate interval.  The ratio
+drops quickly within the first few trials and then fluctuates around the
+expected value of $0.05$.  Small deviations from $0.05$ are due both to the
+finite number of repetitions and to the normal approximation used by the
+binomial CI, but the asymptotic behavior matches the design coverage of the
+interval.
 
-\begin{enumerate}
-    \item \textbf{Random walk.}  Drive straight; on collision, turn by a random
-          angle and continue.  The simplest possible strategy, requiring no
-          state beyond the FSM and no odometry.  Given enough time it
-          probabilistically covers the entire reachable area, but the time to
-          near-full coverage is long and the trajectory looks erratic.
+\subsection{Discussion}
 
-    \item \textbf{Lawnmower (boustrophedon).}  Drive forward until a wall,
-          U-turn while shifting laterally by one body width, then drive in
-          the opposite direction.  The repeating parallel stripes cover the
-          area systematically and quickly.  The main challenges are
-          (i) executing crisp $90°$ turns so successive stripes remain
-          parallel to each other and perpendicular to the walls, and
-          (ii) handling the room boundary: once the robot has marched all the
-          way across the room, the lateral shift gets blocked by the parallel
-          wall and the robot becomes stuck oscillating in the last stripe.
-          Reversing the shift direction at that point keeps the robot moving
-          but only re-covers area it has already cleaned, and it does not
-          guarantee that gaps left by inaccurate stripe spacing get filled.
-
-    \item \textbf{Map-based planning.}  Build an occupancy map of the
-          environment, track the robot's pose against it, and direct the
-          robot toward un-cleaned cells while restarting the local
-          boustrophedon sweep there.  This is what current commercial vacuum
-          robots do.  It dominates the other two in efficiency and coverage
-          guarantee, but requires SLAM and a planning layer.
-\end{enumerate}
-
-\paragraph{Our implementation.}
-We implemented the boustrophedon strategy, since it directly demonstrates the
-characteristic ``zig-zag'' coverage pattern.  The FSM has four states:
-
-\begin{itemize}
-    \item \textbf{SWEEP} -- drive forward at \texttt{FORWARD\_SPEED} until the
-          front cone reads below \newline \texttt{TRIGGER\_DISTANCE}.
-    \item \textbf{TURN\_A} -- rotate $90°$ in the current
-          \texttt{turn\_direction}, using odometry yaw as the target.
-    \item \textbf{SHIFT} -- drive forward by one \texttt{BODY\_WIDTH} (0.34~m)
-          measured against \texttt{/odom} position, or until the front cone
-          trips, or until a wall-clock timeout fires.
-    \item \textbf{TURN\_B} -- rotate another $90°$ in the same direction,
-          which inverts the heading and leaves the robot laterally shifted by
-          one stripe.  The \texttt{turn\_direction} is then flipped so the
-          next U-turn rotates the other way, keeping the lateral shift on the
-          same side of the room and producing parallel stripes.
-\end{itemize}
-
-\paragraph{Turn precision (proportional control).}
-A bang-bang turn at full \texttt{TURN\_SPEED} produces a large yaw overshoot
-when commanded to stop, because the diff-drive plugin has finite angular
-deceleration.  After a single U-turn the heading was off by ${\sim}20°$, and
-this drift accumulated each cycle until the ``parallel stripes'' became visibly
-non-parallel.  We replaced the bang-bang turn with a proportional controller,
-$\omega = \mathrm{clamp}(K_P \cdot \mathrm{yaw\_err},\,\pm \texttt{TURN\_SPEED})$:
-the command runs at maximum speed far from the target and ramps smoothly to
-zero near it, so the angular velocity is already small when the state
-transitions out and the overshoot becomes negligible.  The same trick on the
-SHIFT distance produces clean stripe spacing.
-
-\paragraph{Stuck handling.}
-The original SHIFT exit conditions (full body width covered or front cone
-tripped) did not catch all stuck situations. We added a wall-clock
-timeout on SHIFT: if \texttt{BODY\_WIDTH} has not been covered within
-\texttt{SHIFT\_TIMEOUT} seconds, the SHIFT exits anyway and the U-turn
-completes.
-
-\paragraph{Limitations.}
-As discussed above, the boustrophedon strategy does not detect when the
-parallel wall on the opposite side of the room has been reached, so the robot
-keeps zig-zagging in the last stripe until it is stopped manually.  A natural
-extension would be to detect that several consecutive SHIFT phases failed to
-make significant progress and either declare coverage complete (stop), reverse
-the lateral direction to march back, or hand off to a map-based planner.
-
-A demonstration video is available at
-\url{https://youtu.be/eYblzjBrKoo}.
+The experiment illustrates three Monte Carlo lessons.  First, the number of
+trials drives the quality of the estimate, with variance shrinking like
+$1/\sqrt{n}$, so early trials yield large precision gains and later ones
+yield much smaller ones.  Second, the 95\,\% CI is a statement about
+long-run frequency, not about any single experiment: about 5\,\% of
+intervals miss the true value, which our coverage experiment confirms once
+$n$ is large enough for the normal approximation to be reasonable.  Third,
+estimating $\pi$ via Buffon's Needle is indirect -- we measure $P$ and then
+invert $\pi = 2L/(DP)$ -- so any error in the measured probability propagates
+into the $\pi$ estimate, and stable $\pi$ estimation requires enough trials to
+make $\hat P$ reliable.
 
 \newpage
 % =============================================================================
-\section{Task 2 -- Behaviors of Robot Swarms}
+\section{Task 2 -- Anti-Agents in Swarm Aggregation}
 % =============================================================================
 
 \subsection{Overview}
 
-We implemented and analyzed a decentralized \textbf{swarm aggregation}
-behavior using the \textbf{ARGoS\,3} simulator and a two-state \textbf{Lua}
-controller.  A swarm of \texttt{foot-bot} robots operates in a closed
-$4~\text{m} \times 4~\text{m}$ arena.  By following a simple local rule -- stop
-and wait whenever a neighbor is detected -- a single stable cluster emerges as
-a global property of the swarm.  We analyzed how the speed and stability of
-cluster formation depend on swarm size for
-$N \in \{5, 10, 20, 30, 50\}$.  The full source, configuration, and analysis
-scripts live under \texttt{Task~2/}.
+We extend the baseline swarm-aggregation behavior of Tutorial~2 with
+anti-agents, following the swarm-controlled emergence idea of
+Scheidler, Merkle and Middendorf (IEEE SIS~2007 / IJICC~2013).  Normal robots
+aggregate as before: they wander, stop on neighbor detection, and resume
+wandering after a bounded wait.  Anti-agents look like normal
+\texttt{foot-bot}s but never stop; they wander continuously, count stopped
+neighbors within their sensing range, and broadcast a ``leave'' message
+whenever a local cluster exceeds a size threshold.  Stopped normals that
+receive a leave order abandon the cluster.  The simulator (ARGoS\,3) and the
+analysis toolchain run inside a single Docker image; source, the
+\texttt{argos} configuration, both Lua controllers, and the Python scripts
+live under \texttt{Task~2/}.
+
+We sweep the anti-agent percentage
+$p \in \{0\%, 5\%, 10\%, 15\%, 20\%, 30\%\}$ on a fixed total swarm size of
+$30$ robots in a $4 \times 4~$m arena, with $5$ independent repetitions per
+setting (each run lasts $200~$s of simulated time).  In total $30$ runs
+produced $408{,}000$ log rows analyzed in this section.
 
 \subsection{Implementation}
 
-\paragraph{Two-state FSM (\texttt{task2.lua}).}
-Each robot runs the same decentralized controller with two states:
-
+\paragraph{Normal robot FSM (\texttt{task2.lua}).}
+Three states, communicating only via the Range-and-Bearing (RAB) sensor:
 \begin{itemize}
-    \item \textbf{WANDER} -- drive forward at \texttt{MAX\_VELOCITY = 20~cm/s},
-          steering away from walls and other robots using the 24 infrared
-          proximity sensors.  At every step, query the Range-and-Bearing (RAB)
-          sensor; if any other robot is detected within
-          \texttt{STOP\_DISTANCE = 25~cm}, transition to \textbf{STOPPED} and
-          initialize a wait timer.  LED indicator: green.
-    \item \textbf{STOPPED} -- set wheel velocities to $(0, 0)$ and decrement
-          the \texttt{WAIT\_TICKS = 30} (\,$=3.0$~s) timer.  When the timer
-          reaches zero, return to \textbf{WANDER}.  LED indicator: red.
+    \item \textbf{WANDER} -- forward at \texttt{MAX\_VELOCITY = 20~cm/s} with
+          obstacle avoidance.  Transitions to \textbf{STOPPED} when at least
+          one other normal robot is within
+          \texttt{STOP\_DISTANCE = 25~cm}.  Anti-agents are explicitly ignored
+          for this trigger.  LED: green.
+    \item \textbf{STOPPED} -- zero velocity; wait timer counts down
+          (\texttt{WAIT\_TICKS = 30} = $3.0~$s).  Either the timer expires
+          (return to WANDER) or an anti-agent within
+          \texttt{ANTI\_RANGE = 60~cm} broadcasts a leave flag -- in the
+          latter case the robot enters \textbf{LEAVING}.  LED: red.
+    \item \textbf{LEAVING} -- forced wander for $1.0~$s with obstacle
+          avoidance active but stop triggers ignored, so the robot actually
+          escapes the cluster instead of immediately re-aggregating with the
+          same neighbor.  LED: yellow.
 \end{itemize}
 
-\paragraph{Obstacle avoidance.}
-Avoidance is computed as a virtual repulsion vector summed over the 24
-proximity readings:
-\[
-    \mathbf{F}_{\text{repulsion}} = -\sum_{i=1}^{24}
-        \bigl(v_i \cos\alpha_i\,\mathbf{\hat x} +
-              v_i \sin\alpha_i\,\mathbf{\hat y}\bigr),
-\]
-where $v_i \in [0, 1]$ is the proximity reading and $\alpha_i$ is the sensor
-angle.  When $\|\mathbf{F}_{\text{repulsion}}\| < 0.05$ the robot drives
-straight; otherwise the differential wheel speeds are adjusted toward the
-direction of $\mathbf{F}_{\text{repulsion}}$ using \texttt{TURN\_GAIN = 2.0},
-clamped to $[-20, 20]~\text{cm/s}$.
+\paragraph{Anti-agent (\texttt{anti\_agent.lua}).}
+The anti-agent has no FSM.  Every tick it counts the number of stopped
+normals within \texttt{SCAN\_RANGE = 60~cm} from its RAB messages.  If that
+count is $\ge$~\texttt{CLUSTER\_THRESHOLD = 3} it broadcasts a leave order
+(LED: magenta), otherwise it stays silent (LED: blue).  This is the
+cluster-size dependent disruption rule from the task sheet: small,
+``parasitic'' clusters of 1--2 robots are left alone; only larger clusters
+are broken up.  Motion is the same obstacle-avoidance random walk, plus a
+small per-tick probability of an in-place random reorientation to keep
+exploration unbiased.
+
+\paragraph{RAB message layout.}
+Each broadcast carries 3 bytes: byte~1 is the agent type ($0$ = normal,
+$1$ = anti); byte~2 is the leave flag ($1$ = ``leave the cluster!''); byte~3
+is the \texttt{STOPPED} flag (normals only).  This minimal layout lets normals
+distinguish each other from anti-agents and lets anti-agents count stopped
+normals around them.
 
 \paragraph{Experiment pipeline.}
-\texttt{task2.argos} defines the arena, the swarm population, sensors, and
-loop functions that log the per-tick fraction of stopped robots and per-robot
-neighbor counts to CSV.  \texttt{run\_experiments.py} patches the swarm size
-in a temporary copy of the configuration, runs \texttt{argos3} headlessly
-(\texttt{-z}) for $300~$s at $10$~ticks/s for each $N \in \{5, 10, 20, 30,
-50\}$, and emits per-run and aggregated CSVs under \texttt{data/}.
-\texttt{plot\_results.py} consumes the dataset and writes the three figures
-discussed below.
+\texttt{task2.argos} declares the arena, two \texttt{distribute} blocks (one
+per role), the foot-bot sensors, and the Lua entry points.
+\texttt{run\_experiments.py} patches the two \texttt{entity quantity}
+attributes for each $(p,\text{rep})$ pair, strips the visualization block,
+fixes a deterministic seed
+($\text{seed} = 1000 + 31p + \text{rep}$), runs \texttt{argos3} headlessly,
+and parses the per-tick \texttt{DATA} log lines into a tidy CSV
+(\texttt{data/all\_runs.csv}).  \texttt{plot\_results.py} consumes the CSV
+and produces the four figures and summary tables discussed below.
 
-A cluster is defined as successfully formed when \textbf{99\,\% of the swarm}
-is simultaneously in the \texttt{STOPPED} state.
+\subsection{Subtasks a, b -- Local Rule and Bounded Wait}
 
-\subsection{Subtask a -- Stop on Neighbor Detection \& Subtask b -- Bounded Wait Time}
+The baseline aggregation behavior (subtasks a and b of the assignment) is
+realized by the WANDER~$\leftrightarrow$~STOPPED loop above.  The local rule
+is the RAB-triggered transition at $25~$cm; the bounded wait is the $3.0~$s
+timer.  These are the same primitives as in Tutorial~2 -- in this tutorial
+they form the substrate that the anti-agents perturb.
 
-Both subtasks are realized by the FSM above.  The local rule (``stop on
-neighbor detection'') corresponds to the \texttt{WANDER}~$\to$~\texttt{STOPPED}
-transition triggered by the RAB sensor at $25~$cm.  The bounded wait time is
-the $3.0$~s timer attached to the \texttt{STOPPED} state, after which the
-robot resumes wandering.
+\subsection{Subtask c -- Anti-Agents and Swarm-Controlled Emergence}
 
-\subsection{Subtask c -- Tuning for Aggregation: Cluster Kinetics}
-
-Figure~\ref{fig:task2-stopped} shows the fraction of stopped robots over time
-for the five swarm sizes.
+\paragraph{Aggregation kinetics.}
+Figure~\ref{fig:task2-stopped} shows the fraction of normal robots in
+the STOPPED state over time, averaged across repetitions, for each
+anti-agent percentage.
 
 \begin{figure}[h]
     \centering
     \includegraphics[width=0.85\textwidth]{Task 2/plots/task2_stopped_over_time.png}
-    \caption{Fraction of stopped robots over time for each swarm size.
-             A cluster is declared formed when the curve reaches~99\,\%.}
+    \caption{Fraction of normal robots in STOPPED state vs.\ simulated time,
+             per anti-agent percentage.  The red dashed line marks the
+             $80\%$ aggregation threshold used in Table~\ref{tab:task2-ttc}.}
     \label{fig:task2-stopped}
 \end{figure}
 
-\paragraph{Observations.}
-\begin{itemize}
-    \item \textbf{$N = 50$ (dense):} extremely rapid aggregation; the stopped
-          fraction rises sharply and stabilizes at 100\,\% within $\sim 50$~s.
-    \item \textbf{$N = 30,\,20,\,10$ (medium):} steady, reliable aggregation,
-          reaching the 99\,\% threshold progressively later but remaining
-          stable thereafter.
-    \item \textbf{$N = 5$ (sparse):} fails to aggregate -- the stopped
-          fraction oscillates randomly and never reaches 99\,\%.  Encounter
-          rates are too low to sustain a growing cluster in this arena size.
-\end{itemize}
+With $0\%$ anti-agents the swarm jumps to nearly $100\%$ stopped within a
+few seconds and stays there.  As $p$ grows the curve sits lower and
+oscillates.  No condition prevents the $80\%$
+threshold from being reached within $200~$s, but the quality of the
+aggregate -- one tight cluster vs.\ many small chains -- differs strongly,
+which the next two figures quantify.
 
-\subsection{Subtask d -- Effect of Swarm Size on Speed and Stability}
-
-\paragraph{Time to cluster.}
-Figure~\ref{fig:task2-ttc} and Table~\ref{tab:task2-ttc} summarize the time
-required for the swarm to reach the 99\,\% threshold.
+\paragraph{Time to reach the aggregation threshold.}
+Figure~\ref{fig:task2-ttc} and Table~\ref{tab:task2-ttc} report the first
+simulated time at which the stopped fraction reaches $80\%$.
 
 \begin{figure}[h]
     \centering
     \includegraphics[width=0.7\textwidth]{Task 2/plots/task2_time_to_cluster.png}
-    \caption{Time to form a cluster (99\,\% stopped) vs.\ swarm size.}
+    \caption{Time to reach the $80\%$ aggregation threshold vs.\ anti-agent
+             percentage.  Markers are means over $5$ repetitions; bars are
+             $\pm$~std.}
     \label{fig:task2-ttc}
 \end{figure}
 
 \begin{table}[h]
 \centering
-\begin{tabular}{lc}
+\begin{tabular}{cc}
 \toprule
-\textbf{Swarm size $N$} & \textbf{Time to cluster (s)} \\
+\textbf{Anti-agent \%} & \textbf{Time to $80\%$ stopped (s)} \\
 \midrule
-$5$  & did not cluster \\
-$10$ & $148.5$ \\
-$20$ & $116.0$ \\
-$30$ & $75.5$  \\
-$50$ & $41.0$  \\
+$0\%$   & $7.5 \pm 1.1$  \\
+$5\%$   & $12.4 \pm 3.4$ \\
+$10\%$  & $12.0 \pm 7.8$ \\
+$15\%$  & $12.6 \pm 4.5$ \\
+$20\%$  & $15.7 \pm 7.7$ \\
+$30\%$  & $16.1 \pm 7.5$ \\
 \bottomrule
 \end{tabular}
-\caption{Time required for the stopped fraction to reach 99\,\%.}
+\caption{Mean $\pm$ std time to reach $80\%$ stopped, over $5$ repetitions
+         per setting.  No run failed to cross the threshold within $200~$s.}
 \label{tab:task2-ttc}
 \end{table}
 
-The relationship is markedly non-linear: increasing $N$ reduces the time to
-cluster super-linearly.  Because the arena is fixed, a larger $N$ corresponds
-directly to higher density, which raises the encounter rate.  Once a few
-robots have stopped, they act as ``nucleation sites'' that wandering robots
-collide with, stop next to, and so grow the cluster -- a positive-feedback
-loop that runs much faster at high density.
+Introducing any anti-agents roughly doubles the time to reach $80\%$
+stopped, and the delay grows monotonically with $p$.  The $30$-robot,
+$4 \times 4~$m arena is dense enough that aggregation is robust: the
+anti-agents delay it but never prevent it within the run budget
+(failure fraction $= 0$ for every $p$).
 
-\paragraph{Cluster stability.}
-Figure~\ref{fig:task2-stab} and Table~\ref{tab:task2-stab} report the
-distribution of per-robot neighbor counts in the last $3.0$~s of each run.
+\paragraph{Biggest cluster -- the swarm-controlled-emergence effect.}
+The most interesting result is the size of the largest spatial connected
+component of stopped normals in the final $20~$s of each run, where two
+stopped normals are linked when their Euclidean distance is below
+\texttt{CLUSTER\_DIST}~$=0.35~$m (computed via a simple union-find).
+Figure~\ref{fig:task2-bc} and Table~\ref{tab:task2-bc} report the result.
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=0.7\textwidth]{Task 2/plots/task2_cluster_stability.png}
-    \caption{Distribution of neighbor counts per robot in the final 30 ticks
-             of the simulation.}
-    \label{fig:task2-stab}
+    \includegraphics[width=0.7\textwidth]{Task 2/plots/task2_biggest_cluster.png}
+    \caption{Mean biggest-cluster size in the final $20~$s vs.\ anti-agent
+             percentage.  Error bars show $\pm$~std across $5$ repetitions.}
+    \label{fig:task2-bc}
 \end{figure}
 
 \begin{table}[h]
 \centering
-\begin{tabular}{lcccc}
+\begin{tabular}{cc}
 \toprule
-\textbf{$N$} & \textbf{Mean} & \textbf{Median} & \textbf{Min} & \textbf{Max} \\
+\textbf{Anti-agent \%} & \textbf{Biggest cluster (\# robots)} \\
 \midrule
-$5$  & $0.80$ & $1$ & $0$ & $1$ \\
-$10$ & $1.40$ & $1$ & $1$ & $2$ \\
-$20$ & $1.40$ & $1$ & $1$ & $3$ \\
-$30$ & $1.40$ & $1$ & $1$ & $3$ \\
-$50$ & $1.44$ & $1$ & $1$ & $3$ \\
+$0\%$           & $7.4 \pm 1.0$ \\
+$5\%$           & $7.2 \pm 1.4$ \\
+$10\%$          & $9.6 \pm 3.2$ \\
+$15\%$          & $7.6 \pm 1.0$ \\
+$20\%$          & $8.2 \pm 2.9$ \\
+$30\%$          & $6.0 \pm 1.2$ \\
 \bottomrule
 \end{tabular}
-\caption{Final-window neighbor-count statistics per swarm size.}
-\label{tab:task2-stab}
+\caption{Mean $\pm$ std biggest-cluster size (number of stopped normals in
+         the largest connected component, $0.35~$m link distance, final
+         $20~$s of each run).}
+\label{tab:task2-bc}
 \end{table}
 
-For all successful runs ($N \geq 10$), the median neighbor count is $1$ with
-a tight $[1, 3]$ spread, indicating a stable, tight aggregate.  For $N = 5$
-the minimum drops to $0$: robots frequently drift apart faster than new
-neighbors arrive to reinforce the stopping behavior, and the cluster
-dissolves.
+The biggest cluster is non-monotone in the anti-agent percentage.
+The $10\%$ setting yields the largest cluster ($9.6$ robots on
+average, vs.\ $7.4$ for the unperturbed baseline) -- the counter-intuitive
+``anti-agents help clustering'' regime predicted by Scheidler/Merkle.  At
+$30\%$ the biggest cluster drops to $6.0$, below baseline: this is the
+expected disruptive regime where too many anti-agents prevent the cluster
+from consolidating at all.  The variance at the helpful regime is large
+($\text{std}\approx 3.2$ over $5$ repetitions), so the effect is not
+statistically conclusive at this sample size, but the trend is the one
+predicted by the paper and the task sheet's warning that the effect is
+``tricky to reproduce'' matches our observation that it only emerges in a
+narrow percentage band.
+
+\paragraph{Leave orders per anti-agent.}
+Figure~\ref{fig:task2-leave} reports the number of leave orders issued per
+anti-agent over the whole run, averaged over repetitions.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.7\textwidth]{Task 2/plots/task2_leave_orders.png}
+    \caption{Mean leave orders issued per anti-agent vs.\ anti-agent
+             percentage.  Bars are $\pm$~std across $5$ repetitions.}
+    \label{fig:task2-leave}
+\end{figure}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{cc}
+\toprule
+\textbf{Anti-agent \%} & \textbf{Leave orders / agent} \\
+\midrule
+$5\%$           & $13.2 \pm 4.3$ \\
+$10\%$          & $8.5 \pm 3.6$ \\
+$15\%$          & $12.4 \pm 2.8$ \\
+$20\%$          & $11.3 \pm 3.0$ \\
+$30\%$          & $10.6 \pm 0.8$ \\
+\bottomrule
+\end{tabular}
+\caption{Mean $\pm$ std number of leave orders issued per anti-agent over
+         the $200~$s run.}
+\label{tab:task2-leave}
+\end{table}
+
+The $10\%$ setting shows the fewest leave orders per anti-agent,
+consistent with the biggest-cluster table: when the swarm spends most of
+its time in one large, stable cluster, each anti-agent passes through and
+out of it quickly without continuously re-triggering the leave condition.
+At other percentages the cluster repeatedly fragments and rebuilds, so each
+anti-agent finds itself near a cluster more often and broadcasts more.
+
+\clearpage
+% =============================================================================
+\section{Task 3 -- Local Sampling in a Swarm}
+% =============================================================================
+
+\subsection{Overview}
+
+We study a local sampling scenario in a simulated swarm: $N$ robots
+are placed uniformly at random in the unit square $[0,1]^2$, each robot is
+independently colored black or white with probability $1/2$, and each robot
+observes only the colors of robots that fall inside its sensing
+neighborhood of radius $r$ (including itself).  From its local observation,
+robot $i$ estimates the global number of black robots by scaling its local
+black fraction by the swarm size:
+\[
+    \hat{B}_i \;=\; \frac{B_i^{\text{local}}}{N_i^{\text{local}}} \cdot N.
+\]
+We sweep $N \in \{2, 4, 6, \ldots, 200\}$ and
+$r \in \{0.05,\,0.10,\,0.25,\,0.50\}$, run $1000$ independent experiments per
+$(N, r)$ setting, and report two metrics: the mean relative error
+of the swarm-average estimate, and the standard deviation of the
+individual estimates within the swarm.  Source code lives in
+\texttt{Task~3/task\_3.py}.
+
+\subsection{Implementation}
+
+For each experiment, robot positions $(x_i, y_i)$ are drawn from
+$\mathcal{U}[0,1]^2$ and colors $c_i \in \{0, 1\}$ from
+$\mathcal{U}\{0, 1\}$.  Pairwise distances are computed with
+\texttt{scipy.spatial.distance.cdist} and the neighborhood of robot $i$ is
+$\{j : d(i, j) < r\}$, which always contains $i$ itself.  Each robot then
+forms its estimate $\hat{B}_i$ as above.  For each independent experiment we
+record (i) the swarm-average estimate
+$\bar{\hat B} = \frac{1}{N}\sum_i \hat B_i$ and its relative error against
+the true count $B = \sum_i c_i$, and (ii) the population standard deviation
+of the $\hat B_i$.  The reported values are averaged over $1000$ repetitions
+per $(N, r)$.
+
+\subsection{Results}
+
+Figure~\ref{fig:task3-results} shows both metrics as a function of swarm size
+for the four tested sensor ranges.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.95\textwidth]{Task 3/plots/3_mean_error_and_std_vs_n.png}
+    \caption{Left: mean relative error of the swarm-average estimate.
+             Right: standard deviation of individual robot estimates.
+             Both as a function of swarm size $N$, for sensor ranges
+             $r \in \{0.05,\,0.10,\,0.25,\,0.50\}$.}
+    \label{fig:task3-results}
+\end{figure}
+
+\paragraph{Mean relative error.}
+For the smallest range $r = 0.05$, the swarm-average error stays low across
+the entire $N$ sweep and grows only slightly with $N$.  For larger ranges
+($r = 0.25$ and $r = 0.50$) the error is high for small and medium $N$ and
+then decreases as $N$ grows; $r = 0.50$ exhibits the most pronounced early
+peak (${\sim}0.07$) before relaxing toward ${\sim}0.014$ near $N = 200$.
+The intuition is that with a tiny sensing radius most robots see only
+themselves or a handful of neighbors and produce extreme estimates close to
+$0$ or $N$; these extremes cancel when averaged across the swarm and
+the swarm-average happens to recover the global fraction well.  Larger radii
+produce more moderate but spatially correlated estimates, and at small $N$
+boundary effects and clustering noise bias the average more visibly.
+
+\paragraph{Standard deviation of individual estimates.}
+The picture reverses when looking at intra-swarm disagreement.  Smaller
+sensor ranges produce by far the largest disagreement -- by $N = 200$ the
+standard deviation exceeds $70$ for $r = 0.05$ and stays above $40$ for
+$r = 0.10$.  Larger ranges produce much tighter agreement: $r = 0.25$ ends
+in the mid-to-high teens, and $r = 0.50$ stays below ${\sim}8$ even at
+$N = 200$.  The reason is that larger neighborhoods overlap more across
+robots, so different robots draw conclusions from increasingly similar
+samples and their estimates converge.  The standard deviation also grows
+with $N$ for every $r$, because the estimate $\hat{B}_i$ is scaled by $N$,
+so the same relative spread inflates in absolute terms.
 
 \subsection{Discussion}
 
-The system illustrates how a complex global structure (a single cluster)
-arises from a simple, local rule (``stop for a few seconds if anyone is
-nearby'') with no central control, no global localization, and no
-communication beyond proximity detection.  The mechanism is positive
-feedback: stopped robots act as physical obstacles that other robots steer
-toward and then stop next to themselves.
+The two metrics reveal a clear accuracy/agreement trade-off: small
+sensor ranges can give a good swarm-average estimate (errors cancel
+across the swarm) while simultaneously producing very poor individual
+estimates that disagree wildly with each other.  Large sensor ranges produce
+worse small-$N$ average accuracy but much better inter-robot agreement.
 
-A critical density threshold ($N \geq 10$ in this arena) is needed for the
-positive-feedback loop to outrun the bounded wait time -- below it, stopped
-robots time out and resume wandering before new neighbors arrive, and no
-cluster forms.  Above the threshold, the time to cluster scales
-super-linearly with swarm size.
+Which regime is preferable depends on how the swarm uses the estimate.  If
+the output is computed centrally by averaging all robots' estimates, even a
+very short range can suffice.  If, instead, each robot must act
+independently on its own estimate, then short-range sensing leads to
+inconsistent decisions across the swarm, and a larger range -- or an
+explicit consensus / communication mechanism -- is required.  In practice,
+the mean error alone is not a sufficient evaluation metric for a swarm: the
+intra-swarm spread of estimates is equally important.
 
 \newpage
 % =============================================================================
@@ -425,14 +539,21 @@ super-linearly with swarm size.
 \toprule
 \textbf{Task} & \textbf{Description} & \textbf{Status} \\
 \midrule
-1 & Collision avoidance behavior (FSM, ROS\,2 + Gazebo)        & \checkmark \\
-1 & Wall follower (PD + corner FSM, ROS\,2 + Gazebo)           & \checkmark \\
-1 & Vacuum cleaner (boustrophedon coverage, ROS\,2 + Gazebo)   & \checkmark \\
+1 & Derivation of crossing probability and $\pi$ estimator        & \checkmark \\
+1 & Single Buffon's Needle simulation ($n = 1000$)                & \checkmark \\
+1 & Standard deviation vs.\ number of trials                      & \checkmark \\
+1 & Probability convergence with 95\,\% confidence interval       & \checkmark \\
+1 & Confidence interval coverage ratio                            & \checkmark \\
 \midrule
-2 & Stop on neighbor detection (ARGoS, Lua FSM)                & \checkmark \\
-2 & Bounded wait time before resuming wander                   & \checkmark \\
-2 & Parameter tuning to obtain a single aggregated cluster     & \checkmark \\
-2 & Analysis of swarm size vs.\ speed and stability of cluster & \checkmark \\
+2 & Stop on neighbor detection and bounded wait (ARGoS, Lua FSM)  & \checkmark \\
+2 & Anti-agent controller with cluster-size-dependent leave rule  & \checkmark \\
+2 & Sweep over anti-agent percentage ($30$ runs, $200~$s each)    & \checkmark \\
+2 & Kinetics, biggest-cluster, time-to-cluster, leave-order plots & \checkmark \\
+2 & Reproduction of Scheidler/Merkle helpful-disruption effect    & \checkmark \\
+\midrule
+3 & Local sampling: per-robot estimates of global black count     & \checkmark \\
+3 & Sweep over swarm size $N$ and sensor range $r$                & \checkmark \\
+3 & Mean relative error and intra-swarm estimate spread analysis  & \checkmark \\
 \bottomrule
 \end{tabular}
 \end{center}

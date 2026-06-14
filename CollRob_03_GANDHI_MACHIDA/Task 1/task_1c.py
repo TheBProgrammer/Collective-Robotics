@@ -8,14 +8,14 @@ import matplotlib.pyplot as plt
 # Constants
 L = 0.7     # length of needle
 D = 1       # distance between the lines
-num_experiments = 1000    
+num_experiments = 10000
 
 n_values = np.arange(10, 1010, 10)      # range of n values
 std_devs = []                           # to store standard deviations for each n   
 
 print("Running simulations...")
 for n in n_values:
-    # generate 2D matrices (10,000 exps, n drops each)
+    # generate 2D matrices (num_experiments exps, n drops each)
     x = np.random.uniform(0, D/2, size=(num_experiments, n))
     theta = np.random.uniform(0, np.pi/2, size=(num_experiments, n))
 
