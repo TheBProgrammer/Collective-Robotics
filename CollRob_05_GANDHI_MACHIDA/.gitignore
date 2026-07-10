@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+
+# build artifact: rebuild with `cd task_3 && ./run_docker.sh loop`
+task_3/libforaging_loop.so
+
+# scratch files from patched ARGoS configs
+task_3/data/_tmp_*.argos
+task_3/data/_log_*.txt
