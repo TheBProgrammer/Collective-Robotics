@@ -126,26 +126,54 @@ measured at $0.1494$ against the nominal $P = 0.15$.
 \section{Task 1 -- Urn Model for the Locust Scenario}
 % =============================================================================
 
-\todo{This section is written together with the task~1 implementation.  It
-should describe the measurement of $\Delta L(L)$: simulate for $100$ burn-in
-steps so the swarm settles into a stable collective pattern, then record
-$\Delta L = L_t - L_{t-1}$ for $t \in [101, 120]$, bin each value by $L_{t-1}$,
-and average over ${\approx}5000$ independent runs.  Parameters: $C = 0.5$,
-speed $= 0.01$, $r = 0.045$, $N = 50$, $P = 0.15$.  The simulation is already
-available as \texttt{locust.simulate()}; see Section~1 for its interface and for
-the parameters it takes.}
+Task 1 tests whether the microscopic locust simulation can be described by the
+macroscopic urn model from the lecture.  The full simulation uses $N = 50$
+locusts on a continuous one-dimensional ring with $C = 0.5$, speed $= 0.01$,
+perception range $r = 0.045$ and spontaneous switching probability $P = 0.15$.
+
+For each of $5000$ independent runs, the swarm is first simulated for $100$ time
+steps so that it can settle into an organized collective pattern.  During the
+following $20$ time steps we record the one-step change
+\[
+    \Delta L = L_t - L_{t-1}.
+\]
+Each observed change is binned by the previous state $L_{t-1}$.  For every
+possible value $L \in \{0,\dots,50\}$, the empirical function is estimated as
+\[
+    \Delta L(L) =
+    \frac{\text{sum of observed one-step changes from } L}
+         {\text{number of visits to } L}.
+\]
+States that were not visited are ignored during the fitting step.  The source
+code is in \texttt{task\_1/task\_1.py}; the resulting figure is shown in
+Figure~\ref{fig:task1}.
 
 \subsection{Subtask a -- The Function \texorpdfstring{$\Delta L(L)$}{Delta L(L)}}
 
-\todo{Plot the measured $\Delta L(L)$.  Then discuss the mathematical and
-domain-specific meaning of the positions $L^*$ with $\Delta L(L^*) = 0$: they
-are the fixed points of the averaged one-step dynamics, i.e.\ the values of $L$
-at which the swarm has, on average, no tendency to move either way.
-Distinguish the two \emph{stable} fixed points (the consensus states, near
-$L = 0$ and $L = N$, where the swarm has agreed on a direction) from the
-\emph{unstable} one (the symmetric, undecided state near $L = N/2$, which the
-swarm leaves at the slightest perturbation).  Note that the unstable fixed point
-is exactly the barrier whose crossing task~2 measures.}
+The roots of the measured function,
+\[
+    \Delta L(L^*) = 0,
+\]
+are the fixed points of the averaged one-step dynamics.  At such a value $L^*$,
+the swarm has no expected tendency to increase or decrease the number of
+left-going locusts.
+
+The slope at a root determines its stability.  If the curve crosses the zero
+axis with negative slope, $d(\Delta L)/dL < 0$, the fixed point is stable: a
+small perturbation creates an average change that pushes the swarm back toward
+$L^*$.  If the curve crosses with positive slope, $d(\Delta L)/dL > 0$, the
+fixed point is unstable: a small perturbation is amplified and the swarm moves
+away.
+
+In the locust swarm this has a direct interpretation.  The symmetric state
+$s = 0.5$, or $L = 25$, is the unstable, undecided state.  A perfectly divided
+swarm cannot maintain this balance; any slight majority produces positive
+feedback and drives the swarm toward one of the two collective directions.  The
+stable attractors lie near the edges of the state space, roughly where about
+$15\,\%$ or $85\,\%$ of the swarm moves left.  These are cohesive organized
+states in which the swarm has committed to a direction.  The unstable fixed
+point at $L \approx N/2$ is the same barrier whose crossing is measured in
+Task~2.
 
 \subsection{Subtask b -- Fitting the Swarm Urn Model}
 
@@ -159,20 +187,54 @@ task sheet, is
 where $P_{FB}$ is the probability of positive feedback, $s = L/N$ is the
 fraction of left-goers and $\varphi \in [0, 1]$ is the feedback intensity.
 
-\todo{Fit Equation~\eqref{eq:ds} to the measured data, i.e.\ find $c$ and
-$\varphi$, keeping $\varphi$ inside $[0, 1]$.  Report the fitted values and how
-the fit was obtained.  Remember that the data are $\Delta L$ against $L$, while
-the model is $\Delta s$ against $s$; convert with $s = L/N$ and
-$\Delta s = \Delta L / N$.}
+The measured data are collected as $\Delta L$ against $L$, while the model is
+written as $\Delta s$ against $s$.  Before fitting, the data are therefore
+converted by
+\[
+    s = \frac{L}{N}, \qquad \Delta s = \frac{\Delta L}{N}.
+\]
+We then fit Equation~\eqref{eq:ds} with SciPy's nonlinear least-squares
+optimizer, using bounds $c \ge 0$ and $0 \le \varphi \le 1$.  Over the $5000$
+independent runs, the best-fit parameters are
+\[
+    c = 0.1666, \qquad \varphi = 1.0000.
+\]
+The fitted value of $\varphi$ reaches the upper bound, which means the data are
+best explained by the strongest positive-feedback profile allowed by the model.
 
 \subsection{Subtask c -- Data, Fit and Probability of Positive Feedback}
 
-\todo{Plot the measured data together with the fitted $\Delta s(s)$, and plot the
-resulting $P_{FB}(s, \varphi)$ from Equation~\eqref{eq:pfb}.  Discuss what can be
-said about the results: how well the idealised urn model reproduces the measured
-dynamics, where it deviates (in particular near $s = 0$ and $s = 1$, and near
-the fixed points), and what the fitted $\varphi$ says about the strength of the
-positive feedback in this swarm.}
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{task_1/plots/urn_model_analysis.png}
+    \caption{Left: empirical expected state change $\Delta s(s)$ together with
+             the fitted urn model.  Right: the resulting probability of
+             positive feedback $P_{FB}(s,\varphi)$ with $\varphi = 1.0$.}
+    \label{fig:task1}
+\end{figure}
+
+Figure~\ref{fig:task1} shows that the fitted urn model tracks the empirical
+data closely.  The left panel captures the expected sign of the one-step change:
+near the undecided middle state the dynamics push away from $s = 0.5$, while
+near the polarized states the dynamics point back toward the stable attractors.
+This confirms that the simple macroscopic equation captures the main emergent
+behavior of the microscopic agent-based simulation.
+
+The right panel explains why the middle state is unstable.  With
+$\varphi = 1.0$, the positive feedback probability
+$P_{FB}(s,\varphi) = \sin(\pi s)$ reaches its maximum value at $s = 0.5$.  When
+the swarm is least organized, individual locusts therefore experience the
+strongest possible tendency to align with their local neighbors.  The
+spontaneous switching probability of $15\,\%$ adds noise, but it does not remove
+the strong majority-driven feedback that pushes the swarm toward one of the two
+polarized collective states.
+
+The agreement is not expected to be perfect at every state, because the urn
+model keeps only the macroscopic variable $s$ and discards the spatial
+arrangement of locusts on the ring.  Still, for the purpose of describing the
+average one-step dynamics, the fitted urn model is successful: it reproduces the
+locations and roles of the unstable undecided state and the two stable organized
+states.
 
 \newpage
 % =============================================================================
@@ -569,10 +631,10 @@ cd task_3
 --- & Shared locust simulation, parameterised and vectorised    & \checkmark \\
 --- & Verification against the tutorial-4 implementation        & \checkmark \\
 \midrule
-1 & Measurement of $\Delta L(L)$ over ${\approx}5000$ runs      & \\
-1 & Plot of $\Delta L(L)$; meaning of the zeros $L^*$           & \\
-1 & Fit of the swarm urn model ($c$ and $\varphi$)              & \\
-1 & Plot of data, fit and $P_{FB}$                              & \\
+1 & Measurement of $\Delta L(L)$ over ${\approx}5000$ runs      & \checkmark \\
+1 & Plot of $\Delta L(L)$; meaning of the zeros $L^*$           & \checkmark \\
+1 & Fit of the swarm urn model ($c$ and $\varphi$)              & \checkmark \\
+1 & Plot of data, fit and $P_{FB}$                              & \checkmark \\
 \midrule
 2 & Zone A/B/C bookkeeping, tested against known sequences      & \checkmark \\
 2 & Sweep over swarm size ($10$ sizes, $2 \times 10^6$ steps each) & \checkmark \\
